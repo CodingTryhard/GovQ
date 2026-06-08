@@ -1,0 +1,12 @@
+Hi {{ name }},
+
+Your token has been confirmed.
+
+  Service  : {{ service }}
+  Date     : {{ date }}
+  Time     : {{ hour }}
+  Token no.: #{{ token_number }}
+
+Please arrive 10 minutes before your slot. Keep this email handy.
+
+— GovQ

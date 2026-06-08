@@ -1,0 +1,9 @@
+Hi {{ name }},
+
+You're up next! Token #{{ token_number }} has been called.
+
+Please proceed to Counter {{ counter }}.
+
+If you're not at the office yet, head over now.
+
+— GovQ

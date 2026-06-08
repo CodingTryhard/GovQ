@@ -1,0 +1,10 @@
+Hi {{ name }},
+
+Your visit is complete. Thank you for using GovQ.
+
+  Service    : {{ service }}
+  Served at  : {{ served_at }}
+
+Have a good day.
+
+— GovQ
