@@ -1,0 +1,11 @@
+Hello {{ name }},
+
+Your token #{{ token_number }} for {{ service }} is confirmed!
+
+Date: {{ date }}
+Time slot: {{ hour }}
+
+Please arrive 10 minutes early. You can check your live queue status on the Citizen Portal.
+
+Thank you,
+The GovQ Team

@@ -1,0 +1,9 @@
+Hello {{ name }},
+
+You are almost up! Your token #{{ token_number }} for {{ service }} will be called shortly.
+There are only 3 people ahead of you. 
+
+Please proceed to Counter {{ counter }} and wait for your number to be displayed on the screen.
+
+Thank you,
+The GovQ Team

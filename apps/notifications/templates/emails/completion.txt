@@ -1,0 +1,5 @@
+Hello {{ name }},
+
+Your {{ service }} token #{{ token_number }} has been successfully processed at {{ served_at }}.
+
+Thank you for using GovQ!
