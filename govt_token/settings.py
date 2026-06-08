@@ -140,6 +140,12 @@ CHANNEL_LAYERS = {
     },
 }
 
-# Email Backend Setup for Dev
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-DEFAULT_FROM_EMAIL = 'GovQ <noreply@govq.local>'
+# Email Backend Setup for Production
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'fmpheonix7@gmail.com')
+# Strip spaces from the app password if any
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'REDACTED').replace(" ", "")
+DEFAULT_FROM_EMAIL = f'GovQ <{EMAIL_HOST_USER}>'
