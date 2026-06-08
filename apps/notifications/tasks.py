@@ -1,7 +1,12 @@
+import os
+import resend
 from celery import shared_task
-from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils import timezone
+
+# Configure Resend with the API key from environment variables
+resend.api_key = os.environ.get('EMAIL_HOST_PASSWORD', '')
+FROM_EMAIL = "GovQ <onboarding@resend.dev>"
 
 @shared_task
 def send_booking_confirmation(token_id):
@@ -17,7 +22,16 @@ def send_booking_confirmation(token_id):
         'hour': f"{token.slot.hour:02d}:00",
         'token_number': token.token_number,
     })
-    send_mail(subject, body, None, [token.citizen_email])
+    
+    try:
+        resend.Emails.send({
+            "from": FROM_EMAIL,
+            "to": [token.citizen_email],
+            "subject": subject,
+            "text": body
+        })
+    except Exception as e:
+        print(f"Failed to send email via Resend API: {str(e)}")
 
 
 @shared_task
@@ -39,7 +53,16 @@ def send_reminder_email(token_id):
         'counter': token.counter_number,
         'service': token.slot.service.name,
     })
-    send_mail(subject, body, None, [token.citizen_email])
+    
+    try:
+        resend.Emails.send({
+            "from": FROM_EMAIL,
+            "to": [token.citizen_email],
+            "subject": subject,
+            "text": body
+        })
+    except Exception as e:
+        print(f"Failed to send email via Resend API: {str(e)}")
 
     token.reminder_sent = True
     token.save(update_fields=['reminder_sent'])
@@ -57,7 +80,16 @@ def send_completion_email(token_id):
         'service': token.slot.service.name,
         'served_at': token.served_at.strftime('%I:%M %p'),
     })
-    send_mail(subject, body, None, [token.citizen_email])
+    
+    try:
+        resend.Emails.send({
+            "from": FROM_EMAIL,
+            "to": [token.citizen_email],
+            "subject": subject,
+            "text": body
+        })
+    except Exception as e:
+        print(f"Failed to send email via Resend API: {str(e)}")
 
     token.completion_sent = True
     token.save(update_fields=['completion_sent'])
