@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; }
+        .ticket { max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; }
+        .header { background-color: #10b981; color: white; padding: 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; font-weight: 800; }
+        .header p { margin: 5px 0 0 0; opacity: 0.9; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
+        .content { padding: 30px; text-align: left; }
+        .token-number { font-size: 48px; font-weight: 900; color: #2563eb; text-align: center; margin: 10px 0 30px 0; letter-spacing: -2px; }
+        .label { font-size: 11px; text-transform: uppercase; font-weight: bold; color: #94a3b8; margin: 0 0 4px 0; }
+        .value { font-size: 16px; font-weight: bold; color: #1e293b; margin: 0 0 20px 0; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .qr-section { text-align: center; padding: 20px; background-color: #f8fafc; border-top: 2px dashed #cbd5e1; }
+        .qr-text { font-size: 12px; color: #64748b; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="ticket">
+        <div class="header">
+            <h1>Booking Confirmed!</h1>
+            <p>GovQ Services</p>
+        </div>
+        <div class="content">
+            <p class="label" style="text-align: center;">Your Token Number</p>
+            <div class="token-number">#{{ token_number }}</div>
+            
+            <p class="label">Citizen Name</p>
+            <p class="value">{{ name }}</p>
+
+            <p class="label">Service</p>
+            <p class="value">{{ service }}</p>
+
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 10px;">
+                <tr>
+                    <td width="50%" valign="top">
+                        <p class="label">Date</p>
+                        <p class="value">{{ date }}</p>
+                    </td>
+                    <td width="50%" valign="top">
+                        <p class="label">Time</p>
+                        <p class="value">{{ start_time }} to {{ end_time }}</p>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div class="qr-section">
+            <img src="cid:qrcode_image" alt="QR Code" width="150" height="150" style="display: block; margin: 0 auto; border-radius: 8px; border: 1px solid #e2e8f0; padding: 10px; background: white;" />
+            <p class="qr-text">Scan this code at the counter for fast verification.</p>
+        </div>
+    </div>
+</body>
+</html>
