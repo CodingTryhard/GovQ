@@ -6,7 +6,7 @@ from django.utils import timezone
 
 # Configure Resend with the API key from environment variables
 resend.api_key = os.environ.get('EMAIL_HOST_PASSWORD', '')
-FROM_EMAIL = "GovQ <onboarding@resend.dev>"
+FROM_EMAIL = "onboarding@resend.dev"
 
 @shared_task
 def send_booking_confirmation(token_id):
