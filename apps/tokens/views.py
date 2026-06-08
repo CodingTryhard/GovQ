@@ -45,8 +45,8 @@ def book_token(request):
             citizen_phone=phone,
         )
 
-    # Fire confirmation email asynchronously via Celery
-    send_booking_confirmation.delay(token.id)
+    # Fire confirmation email synchronously to guarantee it sends without a Celery worker
+    send_booking_confirmation(token.id)
 
     return Response({
         'token_id': token.id,
@@ -95,7 +95,7 @@ def call_next(request):
         .first()
     )
     if upcoming and not upcoming.reminder_sent:
-        send_reminder_email.delay(upcoming.id)
+        send_reminder_email(upcoming.id)
 
     # Broadcast to WebSocket display board
     from apps.tokens.consumers import broadcast_token_update
@@ -113,7 +113,7 @@ def mark_served(request, token_id):
     token.served_at = timezone.now()
     token.save()
 
-    send_completion_email.delay(token.id)
+    send_completion_email(token.id)
 
     return Response({'status': 'served'})
 
