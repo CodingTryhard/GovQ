@@ -7,7 +7,7 @@ from django.urls import re_path
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'govt_token.settings')
 
 websocket_urlpatterns = [
-    re_path(r'ws/display/(?P<slot_id>\d+)/$', DisplayBoardConsumer.as_asgi()),
+    re_path(r'ws/display/(?P<service_id>\d+)/$', DisplayBoardConsumer.as_asgi()),
 ]
 
 application = ProtocolTypeRouter({

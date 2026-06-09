@@ -7,4 +7,4 @@ class TokenSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Token
-        fields = ['id', 'slot', 'token_number', 'citizen_name', 'status', 'counter_number', 'payment_status', 'razorpay_order_id']
+        fields = ['id', 'slot', 'unique_hash', 'token_number', 'citizen_name', 'status', 'counter_number', 'payment_status', 'razorpay_order_id', 'expires_at']

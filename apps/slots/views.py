@@ -1,56 +1,82 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from datetime import date, datetime, timedelta
 from .models import Slot
 from .serializers import SlotSerializer
-from datetime import date
+from apps.services.models import Service
 
-@api_view(['GET', 'POST'])
+def generate_slots_for_day(service, target_date):
+    """Automatically generate evenly divided slots based on service operating hours and slot count."""
+    # Convert TimeField to datetime for math
+    start_dt = datetime.combine(target_date, service.start_time)
+    end_dt = datetime.combine(target_date, service.end_time)
+    
+    total_duration_minutes = int((end_dt - start_dt).total_seconds() / 60)
+    slot_duration_minutes = total_duration_minutes // service.number_of_slots
+    
+    slots_to_create = []
+    current_dt = start_dt
+    
+    for _ in range(service.number_of_slots):
+        slot_end_dt = current_dt + timedelta(minutes=slot_duration_minutes)
+        slots_to_create.append(Slot(
+            service=service,
+            date=target_date,
+            start_time=current_dt.time(),
+            end_time=slot_end_dt.time(),
+            status=Slot.Status.AVAILABLE
+        ))
+        current_dt = slot_end_dt
+        
+    Slot.objects.bulk_create(slots_to_create)
+
+@api_view(['GET'])
 @permission_classes([AllowAny])
 def list_or_create_slots(request):
-    if request.method == 'GET':
-        service_id = request.query_params.get('service_id')
-        date_param = request.query_params.get('date')
-        
-        slots = Slot.objects.all()
-        if service_id:
-            slots = slots.filter(service_id=service_id)
-        if date_param:
-            slots = slots.filter(date=date_param)
-            
-        slots = slots.order_by('date', 'hour')
+    service_id = request.query_params.get('service_id')
+    date_param = request.query_params.get('date')
+    
+    if not service_id or not date_param:
+        from django.utils import timezone
+        slots = Slot.objects.filter(date=timezone.now().date()).order_by('start_time')
         serializer = SlotSerializer(slots, many=True)
         return Response(serializer.data)
         
-    elif request.method == 'POST':
-        # Need to extract service_id separately since serializer expects an instance for ForeignKeys by default unless configured
-        # But ModelSerializer handles it if passed 'service' in data.
-        serializer = SlotSerializer(data=request.data)
-        # However, because we defined `service = ServiceSerializer(read_only=True)` in SlotSerializer, it won't accept a write for `service`.
-        # So we have to handle it manually.
+    try:
+        service = Service.objects.get(id=service_id)
+    except Service.DoesNotExist:
+        return Response({'error': 'Service not found'}, status=404)
         
-        service_id = request.data.get('service_id')
-        try:
-            from apps.services.models import Service
-            service = Service.objects.get(id=service_id)
-        except:
-            return Response({'error': 'Valid service_id is required'}, status=400)
-            
-        # Create the slot directly
-        try:
-            slot = Slot.objects.create(
-                service=service,
-                date=request.data.get('date'),
-                hour=request.data.get('hour'),
-                total_capacity=request.data.get('total_capacity', 10),
-                walkin_buffer=request.data.get('walkin_buffer', 3),
-                is_blocked=request.data.get('is_blocked', False)
-            )
-            return Response(SlotSerializer(slot).data, status=201)
-        except Exception as e:
-            return Response({'error': str(e)}, status=400)
+    try:
+        target_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+    except ValueError:
+        return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=400)
 
-@api_view(['PUT', 'DELETE'])
+    # Check if slots exist for this service and date
+    slots = Slot.objects.filter(service=service, date=target_date)
+    
+    if not slots.exists():
+        generate_slots_for_day(service, target_date)
+        slots = Slot.objects.filter(service=service, date=target_date)
+        
+    # Lazy Expiration: check and release any expired locks before returning
+    from django.utils import timezone
+    from apps.tokens.models import Token
+    expired_slots = slots.filter(status=Slot.Status.LOCKED)
+    for s in expired_slots:
+        pending_token = Token.objects.filter(slot=s, status=Token.Status.PENDING).first()
+        if pending_token and pending_token.expires_at and timezone.now() > pending_token.expires_at:
+            pending_token.delete()
+            s.status = Slot.Status.AVAILABLE
+            s.locked_at = None
+            s.save()
+            
+    slots = slots.order_by('start_time')
+    serializer = SlotSerializer(slots, many=True)
+    return Response(serializer.data)
+
+@api_view(['PUT'])
 @permission_classes([AllowAny])
 def slot_detail(request, slot_id):
     try:
@@ -58,15 +84,9 @@ def slot_detail(request, slot_id):
     except Slot.DoesNotExist:
         return Response(status=404)
 
-    if request.method == 'PUT':
-        # Admin updating slot (e.g. blocking it)
-        if 'is_blocked' in request.data:
-            slot.is_blocked = request.data['is_blocked']
-        if 'total_capacity' in request.data:
-            slot.total_capacity = request.data['total_capacity']
+    # Admin updating slot status (e.g. blocking it manually)
+    if 'status' in request.data:
+        slot.status = request.data['status']
         slot.save()
-        return Response(SlotSerializer(slot).data)
-
-    elif request.method == 'DELETE':
-        slot.delete()
-        return Response(status=204)
+        
+    return Response(SlotSerializer(slot).data)

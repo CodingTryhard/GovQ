@@ -1,16 +1,31 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Users, UserCheck, UserX, SkipForward, Megaphone, CheckCircle2 } from 'lucide-react';
+import { Users, UserCheck, UserX, SkipForward, Megaphone, CheckCircle2, QrCode } from 'lucide-react';
+import ScannerModal from '../components/ScannerModal';
 
 export default function CounterDashboard() {
-  const [slotId, setSlotId] = useState(1); // Default slot for demo
+  const [serviceId, setServiceId] = useState(1);
   const [counterId, setCounterId] = useState(1);
   const [queue, setQueue] = useState([]);
   const [currentToken, setCurrentToken] = useState(null);
+  const [services, setServices] = useState([]);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+
+  const fetchServices = async () => {
+    try {
+      const res = await axios.get('/api/services/');
+      setServices(res.data);
+      if (res.data.length > 0 && serviceId === 1) {
+        setServiceId(res.data[0].id);
+      }
+    } catch (err) {
+      console.error("Failed to fetch services", err);
+    }
+  };
 
   const fetchQueue = async () => {
     try {
-      const res = await axios.get(`/api/tokens/queue/?slot_id=${slotId}`);
+      const res = await axios.get(`/api/tokens/queue/?service_id=${serviceId}`);
       setQueue(res.data);
     } catch (err) {
       console.error("Failed to fetch queue", err);
@@ -19,7 +34,7 @@ export default function CounterDashboard() {
 
   const fetchServing = async () => {
     try {
-      const res = await axios.get(`/api/tokens/serving/?slot_id=${slotId}`);
+      const res = await axios.get(`/api/tokens/serving/?service_id=${serviceId}`);
       const myToken = res.data.find(t => t.counter_number === counterId);
       setCurrentToken(myToken || null);
     } catch (err) {
@@ -28,16 +43,23 @@ export default function CounterDashboard() {
   };
 
   useEffect(() => {
+    fetchServices();
+  }, []);
+
+  useEffect(() => {
     fetchQueue();
     fetchServing();
-    const interval = setInterval(fetchQueue, 10000);
+    const interval = setInterval(() => {
+      fetchQueue();
+      fetchServing();
+    }, 5000);
     return () => clearInterval(interval);
-  }, [slotId, counterId]);
+  }, [serviceId, counterId]);
 
   const callNext = async () => {
     if (queue.length === 0) return;
     try {
-      const res = await axios.post('/api/tokens/call-next/', { slot_id: slotId, counter_number: counterId });
+      const res = await axios.post('/api/tokens/call-next/', { service_id: serviceId, counter_number: counterId });
       if (res.data.called_token) {
         fetchServing();
         fetchQueue();
@@ -78,16 +100,18 @@ export default function CounterDashboard() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Active Slot</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Active Service</label>
               <select 
-                value={slotId} 
-                onChange={e => setSlotId(Number(e.target.value))}
+                value={serviceId} 
+                onChange={e => setServiceId(Number(e.target.value))}
                 className="w-full p-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50"
               >
-                <option value={1}>Slot ID 1</option>
-                <option value={2}>Slot ID 2</option>
-                <option value={3}>Slot ID 3</option>
-                <option value={4}>Slot ID 4</option>
+                {services.length === 0 && <option value={1}>Loading services...</option>}
+                {services.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -97,15 +121,32 @@ export default function CounterDashboard() {
           <button 
             onClick={callNext}
             disabled={!!currentToken || queue.length === 0}
-            className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl disabled:opacity-50 hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg flex items-center justify-center gap-2 text-lg"
+            className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl disabled:opacity-50 hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg flex items-center justify-center gap-2 text-lg mb-3"
           >
             <Megaphone size={24} /> Call Next Token
           </button>
+          
+          <button 
+            onClick={() => setIsScannerOpen(true)}
+            className="w-full py-3 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
+          >
+            <QrCode size={20} /> Scan Token QR
+          </button>
+
           {queue.length === 0 && !currentToken && (
-            <p className="text-sm text-slate-500 mt-3 font-medium">Queue is empty</p>
+            <p className="text-sm text-slate-500 mt-4 font-medium">Queue is empty</p>
           )}
         </div>
       </div>
+
+      <ScannerModal 
+        isOpen={isScannerOpen} 
+        onClose={() => setIsScannerOpen(false)} 
+        onProcessed={() => {
+          fetchQueue();
+          fetchServing();
+        }} 
+      />
 
       {/* Main Display */}
       <div className="lg:col-span-2 space-y-8">

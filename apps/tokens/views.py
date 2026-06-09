@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.utils import timezone
+from datetime import timedelta
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -13,65 +14,86 @@ from apps.notifications.tasks import (
     send_reminder_email,
     send_completion_email,
     handle_no_show_timeout,
+    release_locked_slot,
 )
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def book_token(request):
-    """Citizen books a slot. Returns token number."""
-    slot_id      = request.data.get('slot_id')
-    name         = request.data.get('citizen_name')
-    email        = request.data.get('citizen_email')
-    phone        = request.data.get('citizen_phone', '')
+def lock_slot(request):
+    """Citizen selects a slot. Locks it immediately and creates a pending token (5 min expiry)."""
+    slot_id = request.data.get('slot_id')
 
     with transaction.atomic():
         slot = Slot.objects.select_for_update().get(id=slot_id)
 
-        if slot.is_blocked:
-            return Response({'error': 'Slot is blocked.'}, status=400)
+        if slot.status != Slot.Status.AVAILABLE:
+            return Response({'error': 'Slot is no longer available.'}, status=400)
 
-        if slot.is_full:
-            return Response({'error': 'Slot is full.'}, status=400)
+        # Lock the slot
+        slot.status = Slot.Status.LOCKED
+        slot.locked_at = timezone.now()
+        slot.save()
 
-        # Atomic token number: count existing + 1
-        token_number = slot.tokens.exclude(status='cancelled').count() + 1
+        # Let's count valid tokens for this service on this date to assign token number
+        today_valid_tokens = Token.objects.filter(
+            slot__service=slot.service, 
+            slot__date=slot.date
+        ).exclude(status__in=['pending', 'cancelled']).count()
+        
+        token_number = today_valid_tokens + 1
 
         token = Token.objects.create(
             slot=slot,
             token_number=token_number,
-            citizen_name=name,
-            citizen_email=email,
-            citizen_phone=phone,
+            citizen_name='', # Blank for now
+            citizen_email='',
+            status=Token.Status.PENDING,
+            expires_at=timezone.now() + timedelta(minutes=5)
         )
-
-    # Fire confirmation email synchronously to guarantee it sends without a Celery worker
-    send_booking_confirmation(token.id)
 
     return Response({
         'token_id': token.id,
         'token_number': token.token_number,
         'service': slot.service.name,
         'date': slot.date,
-        'hour': slot.hour,
+        'start_time': slot.start_time,
+        'end_time': slot.end_time,
+        'unique_hash': token.unique_hash,
+        'expires_at': token.expires_at,
     }, status=201)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def book_token(request):
+    """Citizen fills out details for their locked slot."""
+    token_id     = request.data.get('token_id')
+    name         = request.data.get('citizen_name')
+    email        = request.data.get('citizen_email')
+    phone        = request.data.get('citizen_phone', '')
+
+    try:
+        token = Token.objects.get(id=token_id, status=Token.Status.PENDING)
+    except Token.DoesNotExist:
+        return Response({'error': 'Token has expired or does not exist.'}, status=400)
+        
+    token.citizen_name = name
+    token.citizen_email = email
+    token.citizen_phone = phone
+    token.save(update_fields=['citizen_name', 'citizen_email', 'citizen_phone'])
+
+    return Response({'status': 'Details updated'}, status=200)
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def call_next(request):
-    """
-    Counter staff calls the next token.
-    Triggers:
-      - reminder email to the token 3 positions ahead (Celery)
-      - no-show timeout task in 5 minutes (Celery)
-    """
-    slot_id        = request.data.get('slot_id')
+    service_id     = request.data.get('service_id')
     counter_number = request.data.get('counter_number', 1)
 
     next_token = (
         Token.objects
-        .filter(slot_id=slot_id, status='booked')
+        .filter(slot__service_id=service_id, slot__date=timezone.now().date(), status='booked')
         .order_by('token_number')
         .first()
     )
@@ -84,20 +106,17 @@ def call_next(request):
     next_token.counter_number = counter_number
     next_token.save()
 
-    # Schedule no-show check after 5 minutes
     handle_no_show_timeout.apply_async((next_token.id,), countdown=300)
 
-    # Send reminder to the token 3 positions ahead in queue
     upcoming = (
         Token.objects
-        .filter(slot_id=slot_id, status='booked')
-        .order_by('token_number')[2:3]  # 3rd in line
+        .filter(slot__service_id=service_id, slot__date=timezone.now().date(), status='booked')
+        .order_by('token_number')[2:3]
         .first()
     )
     if upcoming and not upcoming.reminder_sent:
         send_reminder_email(upcoming.id)
 
-    # Broadcast to WebSocket display board
     from apps.tokens.consumers import broadcast_token_update
     broadcast_token_update(next_token)
 
@@ -107,36 +126,68 @@ def call_next(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def mark_served(request, token_id):
-    """Counter staff marks a token as served."""
     token = Token.objects.get(id=token_id)
     token.status = 'served'
     token.served_at = timezone.now()
     token.save()
 
     send_completion_email(token.id)
-
+    from apps.tokens.consumers import broadcast_token_update
+    broadcast_token_update(token)
     return Response({'status': 'served'})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def ticket_detail(request, unique_hash):
+    try:
+        token = Token.objects.select_related('slot__service').get(unique_hash=unique_hash)
+    except Token.DoesNotExist:
+        return Response({'error': 'Ticket not found'}, status=404)
+        
+    return Response({
+        'id': token.id,
+        'token_number': token.token_number,
+        'citizen_name': token.citizen_name,
+        'service': token.slot.service.name,
+        'date': token.slot.date,
+        'start_time': token.slot.start_time,
+        'end_time': token.slot.end_time,
+        'status': token.status,
+        'counter_number': token.counter_number,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def mark_no_show(request, token_id):
+    token = Token.objects.get(id=token_id)
+    token.status = 'no_show'
+    token.save()
+    from apps.tokens.consumers import broadcast_token_update
+    broadcast_token_update(token)
+    return Response({'status': 'no_show'})
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def mark_skipped(request, token_id):
-    """Admin skips a token entirely."""
     token = Token.objects.get(id=token_id)
     token.status = 'skipped'
     token.save()
+    from apps.tokens.consumers import broadcast_token_update
+    broadcast_token_update(token)
     return Response({'status': 'skipped'})
 
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def list_queue(request):
-    """Returns tokens currently in queue (booked state) for a slot."""
-    slot_id = request.query_params.get('slot_id')
-    if not slot_id:
-        return Response({'error': 'slot_id required'}, status=400)
+    service_id = request.query_params.get('service_id')
+    if not service_id:
+        return Response({'error': 'service_id required'}, status=400)
     
-    tokens = Token.objects.filter(slot_id=slot_id, status='booked').order_by('token_number')
+    tokens = Token.objects.filter(slot__service_id=service_id, slot__date=timezone.now().date(), status='booked').order_by('token_number')
     serializer = TokenSerializer(tokens, many=True)
     return Response(serializer.data)
 
@@ -144,12 +195,11 @@ def list_queue(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def list_serving(request):
-    """Returns tokens currently being served (called state) for a slot."""
-    slot_id = request.query_params.get('slot_id')
-    if not slot_id:
-        return Response({'error': 'slot_id required'}, status=400)
+    service_id = request.query_params.get('service_id')
+    if not service_id:
+        return Response({'error': 'service_id required'}, status=400)
     
-    tokens = Token.objects.filter(slot_id=slot_id, status='called').order_by('token_number')
+    tokens = Token.objects.filter(slot__service_id=service_id, slot__date=timezone.now().date(), status='called').order_by('token_number')
     serializer = TokenSerializer(tokens, many=True)
     return Response(serializer.data)
 
@@ -166,8 +216,6 @@ def create_payment(request, token_id):
             return Response({'error': 'Already paid'}, status=400)
             
         client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
-        
-        # Flat 10 RS fee (1000 paise)
         amount = 1000 
         
         order_data = {
@@ -178,7 +226,6 @@ def create_payment(request, token_id):
         }
         
         order = client.order.create(data=order_data)
-        
         token.razorpay_order_id = order['id']
         token.save()
         
@@ -206,7 +253,6 @@ def verify_payment(request, token_id):
         
         client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
         
-        # Verify signature
         params_dict = {
             'razorpay_order_id': razorpay_order_id,
             'razorpay_payment_id': razorpay_payment_id,
@@ -215,12 +261,20 @@ def verify_payment(request, token_id):
         
         client.utility.verify_payment_signature(params_dict)
         
-        # If no exception thrown, signature is valid
+        # Mark paid
         token.payment_status = 'paid'
         token.razorpay_payment_id = razorpay_payment_id
+        token.status = Token.Status.BOOKED
         token.save()
+
+        # Update slot status
+        slot = token.slot
+        slot.status = Slot.Status.BOOKED
+        slot.save()
+
+        # Fire confirmation email synchronously after successful payment
+        send_booking_confirmation(token.id)
         
         return Response({'status': 'Payment verified successfully'})
     except Exception as e:
         return Response({'error': 'Payment verification failed'}, status=400)
-

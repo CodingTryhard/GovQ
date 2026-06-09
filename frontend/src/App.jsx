@@ -3,29 +3,29 @@ import CitizenPortal from './pages/CitizenPortal';
 import CounterDashboard from './pages/CounterDashboard';
 import DisplayBoard from './pages/DisplayBoard';
 import AdminPanel from './pages/AdminPanel';
+import TicketViewer from './pages/TicketViewer';
 import { PrivacyPolicy, TermsConditions, RefundPolicy, ContactUs } from './pages/LegalPages';
 
 function App() {
   return (
     <BrowserRouter>
       <div className="min-h-screen flex flex-col bg-slate-50">
-        <nav className="bg-slate-900 text-white p-4 shadow-md">
-          <div className="container mx-auto flex justify-between items-center">
-            <h1 className="text-2xl font-bold tracking-tight text-blue-400">GovQ</h1>
-            <div className="space-x-6 text-sm font-medium">
-              <Link to="/" className="hover:text-blue-300 transition-colors">Citizen Portal</Link>
-              <Link to="/counter" className="hover:text-blue-300 transition-colors">Counter Dashboard</Link>
-              <Link to="/display/1" className="hover:text-blue-300 transition-colors">Display Board</Link>
-              <Link to="/admin" className="hover:text-blue-300 transition-colors">Admin Panel</Link>
-            </div>
-          </div>
-        </nav>
+        <Routes>
+          <Route path="/" element={
+            <nav className="bg-slate-900 text-white p-4 shadow-md w-full">
+              <div className="container mx-auto">
+                <h1 className="text-2xl font-bold tracking-tight text-blue-400">GovQ</h1>
+              </div>
+            </nav>
+          } />
+        </Routes>
         <main className="flex-grow container mx-auto p-4 md:p-8">
           <Routes>
             <Route path="/" element={<CitizenPortal />} />
             <Route path="/counter" element={<CounterDashboard />} />
-            <Route path="/display/:slotId" element={<DisplayBoard />} />
+            <Route path="/display/:serviceId" element={<DisplayBoard />} />
             <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/ticket/:hash" element={<TicketViewer />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsConditions />} />
             <Route path="/refund" element={<RefundPolicy />} />

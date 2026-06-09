@@ -2,24 +2,25 @@ from django.db import models
 from apps.services.models import Service
 
 class Slot(models.Model):
+    class Status(models.TextChoices):
+        AVAILABLE = 'available', 'Available'
+        LOCKED    = 'locked',    'Locked'
+        BOOKED    = 'booked',    'Booked'
+
     service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='slots')
     date = models.DateField()
-    hour = models.PositiveSmallIntegerField()         # 0–23
-    total_capacity = models.PositiveIntegerField(default=10)
-    walkin_buffer = models.PositiveIntegerField(default=3)  # reserved for walk-ins
-    is_blocked = models.BooleanField(default=False)  # admin can block (holiday, etc.)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.AVAILABLE)
+    locked_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        unique_together = ('service', 'date', 'hour')
-
-    @property
-    def prebooking_capacity(self):
-        return self.total_capacity - self.walkin_buffer
-
-    @property
-    def booked_count(self):
-        return self.tokens.filter(is_walkin=False).exclude(status='cancelled').count()
+        unique_together = ('service', 'date', 'start_time')
+        ordering = ['date', 'start_time']
 
     @property
     def is_full(self):
-        return self.booked_count >= self.prebooking_capacity
+        return self.status == self.Status.BOOKED
+
+    def __str__(self):
+        return f"{self.service.name} - {self.date} ({self.start_time.strftime('%H:%M')} - {self.end_time.strftime('%H:%M')})"

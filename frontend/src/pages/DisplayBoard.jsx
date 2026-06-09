@@ -3,15 +3,15 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 
 export default function DisplayBoard() {
-  const { slotId } = useParams();
+  const { serviceId } = useParams();
   const [servingList, setServingList] = useState([]);
   const [queue, setQueue] = useState([]);
   
   const fetchState = async () => {
     try {
       const [servingRes, queueRes] = await Promise.all([
-        axios.get(`/api/tokens/serving/?slot_id=${slotId}`),
-        axios.get(`/api/tokens/queue/?slot_id=${slotId}`)
+        axios.get(`/api/tokens/serving/?service_id=${serviceId}`),
+        axios.get(`/api/tokens/queue/?service_id=${serviceId}`)
       ]);
       setServingList(servingRes.data);
       setQueue(queueRes.data.map(t => t.token_number));
@@ -21,12 +21,12 @@ export default function DisplayBoard() {
   };
 
   useEffect(() => {
-    // Fetch initial state
     fetchState();
+    const interval = setInterval(fetchState, 15000); // Polling backup
 
-    // Establish WebSocket connection
-    const wsUrl = `ws://127.0.0.1:8000/ws/display/${slotId}/`;
-    const ws = new WebSocket(wsUrl);
+    // WebSocket connection
+    const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${wsScheme}://${window.location.host}/ws/display/${serviceId}/`);
     
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -41,14 +41,14 @@ export default function DisplayBoard() {
     ws.onclose = () => console.log("WebSocket Disconnected");
     
     return () => ws.close();
-  }, [slotId]);
+  }, [serviceId]);
 
   return (
     <div className="fixed inset-0 bg-slate-900 text-white flex flex-col p-8 overflow-hidden font-sans">
       <header className="flex justify-between items-center mb-12 border-b border-slate-800 pb-6">
         <div>
           <h1 className="text-5xl font-black tracking-tight text-blue-400">GovQ Service Board</h1>
-          <p className="text-xl text-slate-400 mt-2 font-medium">Slot {slotId}</p>
+          <p className="text-xl text-slate-400 mt-2 font-medium">Service #{serviceId}</p>
         </div>
         <div className="text-right">
           <div className="text-4xl font-bold font-mono text-slate-200">
