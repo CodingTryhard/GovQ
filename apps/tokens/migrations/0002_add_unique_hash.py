@@ -3,6 +3,12 @@
 import uuid
 from django.db import migrations, models
 
+def gen_uuid(apps, schema_editor):
+    Token = apps.get_model('tokens', 'Token')
+    for row in Token.objects.all():
+        row.unique_hash = uuid.uuid4()
+        row.save(update_fields=['unique_hash'])
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -11,6 +17,12 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AddField(
+            model_name='token',
+            name='unique_hash',
+            field=models.UUIDField(default=uuid.uuid4, editable=False, null=True),
+        ),
+        migrations.RunPython(gen_uuid, reverse_code=migrations.RunPython.noop),
+        migrations.AlterField(
             model_name='token',
             name='unique_hash',
             field=models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
