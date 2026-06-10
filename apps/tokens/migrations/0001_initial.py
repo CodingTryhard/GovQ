@@ -18,7 +18,6 @@ class Migration(migrations.Migration):
             name='Token',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('unique_hash', models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
                 ('token_number', models.PositiveIntegerField()),
                 ('citizen_name', models.CharField(max_length=150)),
                 ('citizen_email', models.EmailField(max_length=254)),

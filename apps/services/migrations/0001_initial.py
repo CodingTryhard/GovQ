@@ -19,10 +19,6 @@ class Migration(migrations.Migration):
                 ('name', models.CharField(max_length=100)),
                 ('code', models.SlugField(unique=True)),
                 ('description', models.TextField(blank=True)),
-                ('start_time', models.TimeField(default=datetime.time(9, 0))),
-                ('end_time', models.TimeField(default=datetime.time(17, 0))),
-                ('number_of_slots', models.PositiveIntegerField(default=20)),
-                ('is_active', models.BooleanField(default=True)),
             ],
         ),
     ]
