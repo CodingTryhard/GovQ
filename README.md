@@ -78,4 +78,4 @@ Keep `SECRET_KEY`, Razorpay credentials, and any database URLs out of version co
 
 ---
 
-Built with love for better queue management.
+**Built with ❤️ for better queue management.**
