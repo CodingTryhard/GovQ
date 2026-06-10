@@ -1,114 +1,81 @@
-# 🏛️ GovQ — Smart Queue & Token Management System
+# GovQ -- Queue Management System
 
-GovQ is a modern, real-time token booking and queue management system designed for government offices, banks, and service centers. It eliminates physical queues by allowing citizens to book time slots online, pay service fees, and receive digital QR-code tickets.
+GovQ is a token booking and queue management system built for government offices, banks, and service centers. The idea is simple: instead of people showing up and waiting in a physical line, they book a time slot online, pay any applicable fee, and get a QR code ticket that tells them exactly when to show up. Counter staff call tokens from a dashboard, and a public display board shows the live queue status on a screen in the waiting area.
 
-The system features a live-updating Display Board powered by WebSockets, and a comprehensive Admin Panel for counter staff to manage the queue effortlessly.
-
----
-
-## ✨ Key Features
-
-### 👤 Citizen Portal
-- **Online Booking**: Citizens can browse services, pick available dates, and lock time slots.
-- **Payment Gateway Integration**: Secure fee collection via Razorpay.
-- **Digital Tickets**: Auto-generated QR codes upon successful booking.
-
-### 🏢 Counter / Staff Portal
-- **Real-time Queue Management**: "Call Next", "Mark Served", "No-Show", and "Skip" functionality.
-- **QR Scanner**: Instantly scan a citizen's digital ticket to pull up their details.
-- **Live Sync**: All actions instantly reflect on the public Display Board.
-
-### 📺 Public Display Board
-- **WebSocket Powered**: Instantly updates without refreshing the page.
-- **Current Status**: Displays which tokens are currently being served at which counter.
-- **Next in Line**: Shows upcoming tokens to keep citizens informed.
+The whole thing runs in real time over WebSockets. When a counter staff member calls the next token, the display board updates immediately without anyone refreshing a page.
 
 ---
 
-## 🛠️ Technology Stack
+## Features
 
-**Frontend:**
-- React (Vite)
-- Tailwind CSS
-- Axios (API Client)
-- React Router DOM
-- React-QR-Code / HTML5-QRCode
+**Citizen Portal**
 
-**Backend:**
-- Python / Django 
-- Django REST Framework (DRF)
-- Django Channels & Daphne (WebSockets)
-- Redis (Message Broker)
-- SQLite (Local) / PostgreSQL (Production)
-- Razorpay Python SDK
+Citizens can browse available services, pick a date, and lock in a time slot. Payments go through Razorpay. Once a booking is confirmed, the system generates a QR code ticket that the citizen can show at the counter or have scanned by staff.
+
+**Counter Dashboard**
+
+Staff get a clean interface to manage the queue. They can call the next token, mark one as served, skip a slot, or flag a no-show. There is also a built-in QR scanner that pulls up the full booking details when a citizen presents their ticket. Every action on the dashboard reflects on the public display board immediately.
+
+**Public Display Board**
+
+A dedicated screen meant to be shown in the waiting area. It displays which tokens are currently being served at each counter and what is coming up next. It stays in sync with the counter dashboard over a persistent WebSocket connection, so there is no lag and no need to refresh.
 
 ---
 
-## 🚀 Local Development Setup
+## Stack
 
-### 1. Clone the repository
+**Frontend:** React (Vite), Tailwind CSS, Axios, React Router DOM, React-QR-Code, HTML5-QRCode
+
+**Backend:** Django, Django REST Framework, Django Channels + Daphne, Redis, PostgreSQL (production) / SQLite (local), Razorpay Python SDK
+
+---
+
+## Local Setup
+
 ```bash
-git clone https://github.com/YourUsername/GovQ.git
+git clone https://github.com/CodingTryhard/GovQ.git
 cd GovQ
-```
 
-### 2. Backend Setup
-```bash
-# Create and activate virtual environment
+# Backend
 python -m venv venv
-source venv/bin/activate  # On Windows use: venv\Scripts\activate
-
-# Install dependencies
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# Create a .env file and add your keys
 echo "RAZORPAY_KEY_ID=your_test_key" > .env
 echo "RAZORPAY_KEY_SECRET=your_test_secret" >> .env
 
-# Run migrations and start the server
 python manage.py migrate
 python manage.py runserver
-```
 
-### 3. Frontend Setup
-```bash
+# Frontend (open a separate terminal)
 cd frontend
-
-# Install dependencies
 npm install
-
-# Start the Vite development server
 npm run dev
 ```
 
-*Note: For the live Display Board to work locally, ensure you have Redis installed and running on `localhost:6379`, or use a cloud Redis URL.*
+The display board requires a Redis instance running on `localhost:6379` for WebSockets to work locally. If you do not have Redis installed, you can point `REDIS_URL` in your `.env` to a free cloud Redis instance instead.
 
 ---
 
-## 🌍 Production Deployment
+## Deployment
 
-This project includes a `render.yaml` Blueprint for 100% automated backend deployment on Render.
+The repo includes a `render.yaml` blueprint that handles the backend infrastructure automatically. Connect the repo on Render via New > Blueprint and it provisions a PostgreSQL database, a Redis instance, and a Daphne server without any manual configuration.
 
-### Backend (Render)
-1. Go to **Render.com** and click **New -> Blueprint**.
-2. Connect this repository.
-3. Render will automatically provision a free PostgreSQL database, a free Redis instance, and build your Daphne web server.
-4. Go to your new Web Service on Render, click **Environment**, and add your Razorpay keys:
-   - `RAZORPAY_KEY_ID`
-   - `RAZORPAY_KEY_SECRET`
+After the services are created, go to your web service on Render, open the Environment tab, and add the following:
 
-### Frontend (Vercel)
-1. Import the `frontend` folder into **Vercel**.
-2. In the Vercel project settings, add the following Environment Variable:
-   - `VITE_API_URL` = `https://your-render-url.onrender.com` (No trailing slash)
-3. Deploy!
+- `RAZORPAY_KEY_ID`
+- `RAZORPAY_KEY_SECRET`
+
+For the frontend, import the `frontend` folder into Vercel as a separate project and add one environment variable:
+
+- `VITE_API_URL` set to your Render backend URL, with no trailing slash
 
 ---
 
-## 🔒 Security Notes
-- Ensure your `SECRET_KEY` and Razorpay Secrets are never committed to version control.
-- In production, Django `DEBUG` is strictly set to `False`.
+## Notes
+
+Keep `SECRET_KEY`, Razorpay credentials, and any database URLs out of version control. Use environment variables for all of these in production. `DEBUG` is set to `False` in the production settings.
 
 ---
 
-**Built with ❤️ for better queue management.**
+Built with love for better queue management.
