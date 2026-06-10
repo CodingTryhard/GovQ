@@ -19,6 +19,7 @@ class Migration(migrations.Migration):
                 ('name', models.CharField(max_length=100)),
                 ('code', models.SlugField(unique=True)),
                 ('description', models.TextField(blank=True)),
+                ('is_active', models.BooleanField(default=True)),
             ],
         ),
     ]

@@ -53,7 +53,6 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'govt_token.urls'
 
@@ -151,3 +150,6 @@ EMAIL_USE_SSL = False
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+# Frontend URL (used for QR codes in emails)
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5174')

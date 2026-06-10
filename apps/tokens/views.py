@@ -108,12 +108,12 @@ def call_next(request):
 
     handle_no_show_timeout.apply_async((next_token.id,), countdown=300)
 
-    upcoming = (
+    upcoming_qs = list(
         Token.objects
         .filter(slot__service_id=service_id, slot__date=timezone.now().date(), status='booked')
         .order_by('token_number')[2:3]
-        .first()
     )
+    upcoming = upcoming_qs[0] if upcoming_qs else None
     if upcoming and not upcoming.reminder_sent:
         send_reminder_email(upcoming.id)
 
@@ -126,12 +126,18 @@ def call_next(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def mark_served(request, token_id):
-    token = Token.objects.get(id=token_id)
+    try:
+        token = Token.objects.get(id=token_id)
+    except Token.DoesNotExist:
+        return Response({'error': 'Token not found'}, status=404)
     token.status = 'served'
     token.served_at = timezone.now()
     token.save()
 
-    send_completion_email(token.id)
+    try:
+        send_completion_email(token.id)
+    except Exception as e:
+        print(f"Completion email failed: {e}")
     from apps.tokens.consumers import broadcast_token_update
     broadcast_token_update(token)
     return Response({'status': 'served'})
@@ -161,7 +167,10 @@ def ticket_detail(request, unique_hash):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def mark_no_show(request, token_id):
-    token = Token.objects.get(id=token_id)
+    try:
+        token = Token.objects.get(id=token_id)
+    except Token.DoesNotExist:
+        return Response({'error': 'Token not found'}, status=404)
     token.status = 'no_show'
     token.save()
     from apps.tokens.consumers import broadcast_token_update
@@ -172,7 +181,10 @@ def mark_no_show(request, token_id):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def mark_skipped(request, token_id):
-    token = Token.objects.get(id=token_id)
+    try:
+        token = Token.objects.get(id=token_id)
+    except Token.DoesNotExist:
+        return Response({'error': 'Token not found'}, status=404)
     token.status = 'skipped'
     token.save()
     from apps.tokens.consumers import broadcast_token_update

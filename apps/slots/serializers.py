@@ -4,6 +4,7 @@ from apps.services.serializers import ServiceSerializer
 
 class SlotSerializer(serializers.ModelSerializer):
     service = ServiceSerializer(read_only=True)
+    is_full = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Slot
