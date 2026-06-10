@@ -11,7 +11,7 @@ def gen_uuid(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tokens', '0001_initial'),
+        ('tokens', '0002_token_expires_at_token_payment_status_and_more'),
     ]
 
     operations = [
