@@ -6,8 +6,7 @@ from django.db import migrations, models
 def gen_uuid(apps, schema_editor):
     Token = apps.get_model('tokens', 'Token')
     for row in Token.objects.all():
-        row.unique_hash = uuid.uuid4()
-        row.save(update_fields=['unique_hash'])
+        Token.objects.filter(pk=row.pk).update(unique_hash=uuid.uuid4())
 
 class Migration(migrations.Migration):
 
