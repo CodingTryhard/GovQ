@@ -54,7 +54,7 @@ def send_booking_confirmation(token_id):
     frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5174')
     qr_text = f"{frontend_url}/ticket/{token.unique_hash}"
     
-    qr = qrcode.QRCode(version=1, box_size=10, border=4)
+    qr = qrcode.QRCode(version=1, box_size=5, border=4)
     qr.add_data(qr_text)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
