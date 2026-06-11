@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: govq_user
+      POSTGRES_PASSWORD: govq_password
+      POSTGRES_DB: govq
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgres://govq_user:govq_password@db:5432/govq
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=django-insecure-production-key-change-me
+      - DEBUG=False
+      - ALLOWED_HOSTS=*
+      - FRONTEND_URL=http://localhost
+      - CELERY_TASK_ALWAYS_EAGER=True
+      # Make sure to set these in a real production environment or local .env file
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-dummy}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-dummy}
+    depends_on:
+      - db
+      - redis
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+      args:
+        # Bake the backend API URL into the React build
+        - VITE_API_BASE_URL=http://localhost:8000
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
